@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 用户的专属记忆卡片表
+model UserWordCard {
+  id             String      @id @default(uuid())
+  userId         String      // 🌟 核心升级：区分这是哪个用户的卡片 (未来对接用户系统)
+  word           String      // 单词本尊
+  meaning        String?     // 中文释义
+  
+  // 🌟 内容精装修模块 (新特性)
+  phonetic        String?   // 音标 (比如 /əˈbændən/)
+  exampleSentence String?   // 例句 (比如 "He decided to abandon the plan.")
+  exampleMeaning  String?   // 例句翻译 (比如 "他决定放弃这个计划。")
+  
+  // FSRS 算法记忆状态
+  state          Int         @default(0)  // 0=新词, 1=学习中, 2=复习中, 3=重学
+  reps           Int         @default(0)  // 总复习次数
+  lapses         Int         @default(0)  // 遗忘次数
+  difficulty     Float       @default(0)  // 难度系数 (D)
+  stability      Float       @default(0)  // 稳定性 (S)
+  retrievability Float       @default(0)  // 记忆保留率 (R)
+  lastReview     DateTime?                // 上次复习时间
+  dueDate        DateTime    @default(now()) // ⚠️ 下次该复习的时间
+
+  reviewLogs     ReviewLog[]              // 关联的复习流水
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // 联合唯一索引：同一个用户不能有两张相同的单词卡片
+  @@unique([userId, word]) 
+}
+
+// 复习流水表（记录每次背单词的反馈，用于算法调优）
+model ReviewLog {
+  id               String   @id @default(uuid())
+  cardId           String
+  card             UserWordCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  rating           Int      // 反馈：1=忘记, 2=模糊, 3=认识, 4=太简单
+  durationMs       Int      @default(0) // 耗时(毫秒)
+  
+  // 复习前的状态快照
+  stateBefore      Int
+  difficultyBefore Float
+  stabilityBefore  Float
+  
+  createdAt        DateTime @default(now()) // 本次复习发生的时间
+}
